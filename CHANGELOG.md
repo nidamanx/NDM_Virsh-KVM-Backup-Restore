@@ -56,3 +56,5 @@ Backups made by 1.0.0 work unchanged.
   interactive menu, configuration file, zstd compression, comparison with
   `qemu-img compare`.
 
+[Unreleased]: https://github.com/nidamanx/NDM_Virsh-KVM-Backup-Restore/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/nidamanx/NDM_Virsh-KVM-Backup-Restore/releases/tag/v1.2.0
