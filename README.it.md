@@ -743,7 +743,8 @@ bash -n ndm_virsh-kvm-backup-restore.sh
 ```
 
 Entrambi passano senza segnalazioni a ogni release. La CI li esegue a
-ogni push, insieme a prove della riga di comando (aiuto, versione, uso
+ogni push su `main`, a ogni tag di release e a ogni pull request,
+insieme a prove della riga di comando (aiuto, versione, uso
 non valido, un file di configurazione che non deve mai essere eseguito)
 e a un controllo che la versione sia la stessa nello script, in entrambi
 i README, in `CHANGELOG.md` e in `CITATION.cff`.

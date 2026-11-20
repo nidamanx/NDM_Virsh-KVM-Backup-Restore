@@ -713,8 +713,9 @@ shellcheck ndm_virsh-kvm-backup-restore.sh
 bash -n ndm_virsh-kvm-backup-restore.sh
 ```
 
-Both run clean on every release. The CI runs them on every push, with
-smoke tests of the command line (help, version, invalid usage, a
+Both run clean on every release. The CI runs them on every push to
+`main`, every release tag and every pull request, with smoke tests of
+the command line (help, version, invalid usage, a
 configuration file that must never be executed) and a check that the
 version is the same in the script, both READMEs, `CHANGELOG.md` and
 `CITATION.cff`.
