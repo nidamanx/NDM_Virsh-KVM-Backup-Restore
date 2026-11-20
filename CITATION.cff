@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use this software, or parts of its code, please cite it as below."
+type: software
+title: "NDM virsh KVM Backup Restore"
+abstract: >-
+  A single Bash script to back up a shut-off libvirt/KVM virtual machine (definition,
+  local disks, UEFI NVRAM, emulated TPM state) without snapshots, prove the backup boots
+  with a disposable test VM, restore it to its original paths or as a renamed copy, and
+  manage the backups. Disks are compressed qcow2 images, compared with the original by
+  qemu-img compare and recorded in SHA256SUMS; nothing existing is ever overwritten.
+authors:
+  - given-names: "Nicola Davide"
+    family-names: "Mannarelli"
+    alias: "nidamanx"
+repository-code: "https://github.com/nidamanx/NDM_Virsh-KVM-Backup-Restore"
+url: "https://github.com/nidamanx/NDM_Virsh-KVM-Backup-Restore"
+license: AGPL-3.0-or-later
+version: "1.2.0"
+date-released: "2026-11-20"
+keywords:
+  - bash
+  - cli
+  - backup
+  - restore
+  - kvm
+  - qemu
+  - libvirt
+  - virsh
+  - virt-manager
+  - virtual-machine
+  - qcow2
+  - disaster-recovery
+  - sysadmin
+  - linux

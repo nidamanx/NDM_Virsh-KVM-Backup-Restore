@@ -1,0 +1,102 @@
+# ndm_virsh-kvm-backup-restore.conf
+# Configuration of ndm_virsh-kvm-backup-restore.sh, read from the
+# script's own folder (or given with -c FILE).
+#
+# This is the example shipped with the project: copy it to
+# ndm_virsh-kvm-backup-restore.conf (kept out of git) and edit that, or
+# let the menu (s) create it from this file. Without a .conf, the
+# script uses the defaults shown here.
+#
+# One KEY=value per line, # for comments, value optionally in quotes.
+# The file is read, never executed: quotes inside a value, backslashes,
+# $ and ` are refused. A missing key takes the default shown here.
+# The menu (s) changes these settings and keeps these comments.
+
+# Folder for the backups (one subfolder <vm>-<timestamp> per backup).
+# A relative path starts at this file's folder; ~ is the home of the
+# user who ran sudo. The default backup/ ships with the project (its
+# content is git-ignored); any other folder is created, after asking,
+# at the first backup.
+BACKUP_DIR="./backup"
+
+# Who owns each backup: its folder, descriptive files (domain.xml,
+# sources.txt, *.info.txt, SHA256SUMS), disk images and NVRAM.
+#   user  the user who ran sudo: folders 0750, descriptive files 0640,
+#         disks and NVRAM 0600. Browsing works without sudo, and
+#         user-level backup tools (Back In Time) can copy the backups.
+#   root  root only: folders 0700, files 0600. Reading or copying a
+#         backup always needs sudo or a tool running as root.
+# TPM state keeps its owner in both cases.
+#
+# DANGER with user: a backup holds the whole VM, every key and password
+# stored on it, and with user anything running as that user reads it
+# without sudo: a malicious browser extension, a compromised program, a
+# sync client (Nextcloud, Dropbox) that uploads the folder, a backup
+# tool that copies it to storage that is not encrypted. Choose root if
+# nothing running as that user needs to read the backups.
+# With either value, keep backups (and every copy of them) on encrypted
+# storage (LUKS): owners and modes protect nothing once the disk is in
+# other hands, since whoever holds it is root on their own machine.
+BACKUP_OWNER="user"
+
+# Compression inside each backup disk's qcow2 (lossless, per block):
+#   zstd  best size and speed, needs QEMU 5.1 or later
+#   zlib  for older QEMU
+#   none  no compression
+# The backup stays directly usable (verify, test boot); restore writes
+# the disks back uncompressed.
+COMPRESS="zstd"
+
+# After each disk is written, prove with qemu-img compare that the VM
+# sees exactly the same content as on the original disk; on any
+# difference the backup is marked .INVALID. It reads both disks in
+# full, so it takes about as long again as the copy.
+#   yes  compare (recommended)
+#   no   skip it
+COMPARE="yes"
+
+# libvirt connection. qemu:///system is the one virt-manager uses for
+# system VMs. Local connections only (qemu:///system, qemu:///session):
+# other transports can make libvirt run a command. It is not a disk
+# location: disks are found from each VM's own definition.
+LIBVIRT_URI="qemu:///system"
+
+# Name prefix of the test VM made by test-start (prefix + VM name).
+# Letters, digits, . _ - and ending with -. Test VMs also carry a
+# marker in their libvirt description and only marked VMs are ever
+# removed, so a real VM whose name starts with the prefix is safe.
+# Remove existing test VMs before changing it.
+TEST_PREFIX="zztest-restore-"
+
+# Parent folder of the test VM's files (test-start): a subfolder
+# <TEST_PREFIX><vm> is made in it and removed by test-clean. Empty: next
+# to the original VM's disks if that folder exists here, else the
+# "default" storage pool's folder, else /var/lib/libvirt/images. The
+# menu asks for it at each test, with this as the default.
+TEST_BASE_DIR=""
+
+# Default answer in the menu to "start the test VM with a network
+# card?":
+#   no   no network, check it from its console; the original VM can
+#        keep running at the same time
+#   yes  same network as the original (same IP, keys, jobs): refused
+#        while the original VM runs
+TEST_NETWORK="no"
+
+# Default test-start mode (the menu asks at each test, showing the
+# space each one needs):
+#   overlay  the test VM boots the backup's own disks, opened read-only;
+#            what it writes goes to a small file in the test folder.
+#            Starts at once, needs little space; the backup's disk must
+#            stay connected, and the hypervisor's user must be able to
+#            pass through the folders above the backup (not the case
+#            under /media/<user>/: see the README, external disk)
+#   copy     the test VM boots a copy of the backup's disks: needs the
+#            backup's size and the time to copy it
+TEST_MODE="overlay"
+
+# Prefix of the VM name and of the disk file names when restoring as a
+# renamed copy (restore --copy, menu 6): myvm.qcow2 comes back as
+# restore-myvm.qcow2 next to it, VM restore-myvm. Letters, digits,
+# . _ -, ending with -.
+RESTORE_PREFIX="restore-"

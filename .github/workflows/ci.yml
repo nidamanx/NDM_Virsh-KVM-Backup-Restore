@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SCRIPT: ndm_virsh-kvm-backup-restore.sh
+
+jobs:
+  secrets:
+    runs-on: ubuntu-24.04
+    steps:
+      # Actions are pinned to a commit SHA (version in the comment); Dependabot updates both
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: No keys or secrets in the repository
+        run: scripts/check-secrets.sh
+
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Syntax
+        run: |
+          bash -n "$SCRIPT"
+          bash -n scripts/check-secrets.sh
+
+      - name: ShellCheck
+        run: shellcheck "$SCRIPT" scripts/check-secrets.sh
+
+      - name: Version matches in every file
+        # APP_VERSION and APP_RELEASE_DATE are the reference; on a tag push the tag must match too
+        run: |
+          ver=$(sed -n 's/^APP_VERSION="\(.*\)"$/\1/p' "$SCRIPT")
+          date=$(sed -n 's/^APP_RELEASE_DATE="\(.*\)"$/\1/p' "$SCRIPT")
+          echo "APP_VERSION=$ver APP_RELEASE_DATE=$date"
+          fail=0
+          expect() {  # file, what, found, wanted
+            if [[ $3 != "$4" ]]; then
+              echo "::error file=$1::$2 is '$3', expected '$4'"; fail=1
+            fi
+          }
+          for f in README.md README.it.md CITATION.cff CHANGELOG.md; do
+            [[ -f $f ]] || { echo "::error file=$f::$f is missing"; fail=1; }
+          done
+          for f in README.md README.it.md; do
+            [[ -f $f ]] || continue
+            expect "$f" "version badge" "$(sed -n 's/.*badge\/version-\([^-]*\)-informational.*/\1/p' "$f")" "$ver"
+            expect "$f" "menu sample" "$(sed -n 's/^NDM virsh KVM Backup Restore \([^ ]*\) - .*/\1/p' "$f")" "$ver"
+          done
+          expect README.md "version line" "$(sed -n 's/^Version \*\*\([^*]*\)\*\*, released \([0-9-]*\)\..*/\1 \2/p' README.md)" "$ver $date"
+          expect README.it.md "version line" "$(sed -n 's/^Versione \*\*\([^*]*\)\*\*, pubblicata il \([0-9-]*\)\..*/\1 \2/p' README.it.md)" "$ver $date"
+          expect CITATION.cff "version" "$(sed -n 's/^version: "\(.*\)"$/\1/p' CITATION.cff)" "$ver"
+          expect CITATION.cff "date-released" "$(sed -n 's/^date-released: "\(.*\)"$/\1/p' CITATION.cff)" "$date"
+          expect CHANGELOG.md "latest release" "$(grep -m1 -E '^## \[[0-9]' CHANGELOG.md)" "## [$ver] - $date"
+          if [[ $GITHUB_REF_TYPE == tag ]]; then
+            expect "$SCRIPT" "tag" "$GITHUB_REF_NAME" "v$ver"
+          fi
+          exit "$fail"
+
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Version and help
+        run: |
+          ./"$SCRIPT" --version
+          ./"$SCRIPT" -V > /dev/null
+          ./"$SCRIPT" --help > /dev/null
+          ./"$SCRIPT" -h > /dev/null
+
+      - name: Stub virsh and qemu-img
+        # The runner has no libvirt: stubs let the script get past its dependency check,
+        # up to the root check, without ever reaching a hypervisor
+        run: |
+          mkdir -p "$RUNNER_TEMP/stub"
+          for c in virsh qemu-img; do
+            printf '#!/bin/sh\nexit 1\n' > "$RUNNER_TEMP/stub/$c"
+            chmod +x "$RUNNER_TEMP/stub/$c"
+          done
+          echo "$RUNNER_TEMP/stub" >> "$GITHUB_PATH"
+
+      - name: Invalid usage exits with 1
+        # Only what is refused before the root check; argument counts are checked as root
+        run: |
+          for args in "nope" "--nope" "-c" "-c /nonexistent.conf"; do
+            rc=0; out=$(./"$SCRIPT" $args 2>&1 < /dev/null) || rc=$?
+            [[ $rc -eq 1 && ($out == *"--help for usage"* || $out == *"not found"*) ]] \
+              || { echo "::error::'$args' exited with $rc: $out"; exit 1; }
+          done
+
+      - name: The example configuration is accepted
+        # Parsed without error, the script stops only at the root check
+        run: |
+          rc=0; out=$(./"$SCRIPT" -c ndm_virsh-kvm-backup-restore.conf.example verify x 2>&1 < /dev/null) || rc=$?
+          echo "$out"
+          [[ $rc -eq 1 && $out == *"run as root"* ]]
+
+      - name: The configuration file is never executed
+        run: |
+          marker="$RUNNER_TEMP/executed"
+          bad() {  # line, expected message
+            printf '%s\n' "$1" > "$RUNNER_TEMP/bad.conf"
+            rc=0; out=$(./"$SCRIPT" -c "$RUNNER_TEMP/bad.conf" verify x 2>&1 < /dev/null) || rc=$?
+            [[ $rc -eq 1 && $out == *"$2"* ]] || { echo "::error::'$1': exit $rc, output: $out"; exit 1; }
+            [[ ! -e $marker ]] || { echo "::error::'$1' ran a command"; exit 1; }
+          }
+          bad "BACKUP_DIR=\"\$(touch $marker)\"" "must not contain"
+          bad "BACKUP_DIR=\`touch $marker\`" "must not contain"
+          bad "touch $marker" "expected KEY=value"
+          bad "FOO=bar" "is not a known setting"
+          bad "COMPRESS=xz" "must be zstd, zlib or none"
+          bad "LIBVIRT_URI=qemu+ssh://host/system" "must be a local connection"
+          # Accepted as a plain value, never run
+          bad "BACKUP_DIR=x; touch $marker" "run as root"
