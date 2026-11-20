@@ -6,10 +6,9 @@ Only the latest release receives security fixes.
 
 ## Reporting a vulnerability
 
-Please do not open a public issue for a security problem. Use the
-private vulnerability reporting of the repository's hosting platform
-(the Security tab on GitHub, a confidential issue on GitLab), and
-include:
+Please do not open a public issue for a security problem. Use GitHub's
+private vulnerability reporting instead: open the **Security** tab of
+this repository and click **Report a vulnerability**. Include:
 
 - the script version (`ndm_virsh-kvm-backup-restore.sh -V`);
 - the distribution, and the libvirt and QEMU versions;
